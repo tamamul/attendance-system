@@ -23,15 +23,14 @@ jobs:
       - name: Install dependencies
         run: composer install --no-dev --optimize-autoloader
 
-      - name: Prepare artifact
+      - name: Prepare artifact (zip project + db.sql)
         run: |
-          mkdir build
-          cp -r . build/laravel_app
-          # pastikan db.sql juga ikut
-          cp db.sql build/laravel_app/ || true
-          cd build
-          zip -r ../laravel_app.zip laravel_app
-          cd ..
+          mkdir -p /tmp/build
+          rsync -av --exclude='.git' --exclude='vendor' ./ /tmp/build/laravel_app
+          cp db.sql /tmp/build/laravel_app/ || true
+          cd /tmp/build
+          zip -r laravel_app.zip laravel_app
+          mv laravel_app.zip $GITHUB_WORKSPACE/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
