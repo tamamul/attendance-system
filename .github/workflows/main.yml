@@ -1,4 +1,4 @@
-name: Laravel Build
+name: Build Laravel App
 
 on:
   push:
@@ -10,29 +10,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
-    - name: Setup PHP
-      uses: shivammathur/setup-php@v2
-      with:
-        php-version: '8.2'
-        extensions: mbstring, intl, bcmath, pdo, sqlite, mysql, openssl, tokenizer, xml, ctype, json, curl
-        coverage: none
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, bcmath, intl, pdo, pdo_mysql
+          tools: composer
 
-    - name: Install Composer dependencies
-      run: composer install --no-dev --optimize-autoloader
+      - name: Install dependencies
+        run: composer install --no-dev --optimize-autoloader
 
-    - name: Prepare environment
-      run: |
-        cp .env.example .env
-        php artisan key:generate
+      - name: Prepare artifact
+        run: |
+          mkdir build
+          cp -r . build/laravel_app
+          # pastikan db.sql juga ikut
+          cp db.sql build/laravel_app/ || true
+          cd build
+          zip -r ../laravel_app.zip laravel_app
+          cd ..
 
-    - name: Create ZIP artifact
-      run: zip -r laravel_app.zip . -x "*.git*"
-
-    - name: Upload build artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: laravel_app
-        path: laravel_app.zip
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: laravel_app
+          path: laravel_app.zip
