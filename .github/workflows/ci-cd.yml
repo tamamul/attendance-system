@@ -141,4 +141,3 @@ jobs:
           deployment/db.sql
           deployment/schema.sql
         retention-days: 30
-EOF
