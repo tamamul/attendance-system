@@ -1,0 +1,141 @@
+# Buat file workflow
+cat > .github/workflows/ci-cd.yml << 'EOF'
+name: Laravel Attendance System CI/CD
+
+on:
+  push:
+    branches: [ master, main, develop ]
+  pull_request:
+    branches: [ master, main, develop ]
+
+jobs:
+  laravel-tests:
+    runs-on: ubuntu-latest
+    
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: attendance_system
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.1'
+        extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql, sqlite
+        coverage: none
+
+    - name: Copy .env
+      run: |
+        cp .env.example .env
+        echo "APP_ENV=testing" >> .env
+        echo "DB_CONNECTION=mysql" >> .env
+        echo "DB_HOST=127.0.0.1" >> .env
+        echo "DB_PORT=3306" >> .env
+        echo "DB_DATABASE=attendance_system_test" >> .env
+        echo "DB_USERNAME=root" >> .env
+        echo "DB_PASSWORD=password" >> .env
+        echo "APP_KEY=base64:$(openssl rand -base64 32)" >> .env
+
+    - name: Install dependencies
+      run: |
+        composer install --prefer-dist --no-progress --no-interaction
+
+    - name: Generate key
+      run: php artisan key:generate
+
+    - name: Create test database
+      run: |
+        mysql -h 127.0.0.1 -u root -ppassword -e "CREATE DATABASE IF NOT EXISTS attendance_system_test;"
+
+    - name: Run migrations for testing
+      run: |
+        php artisan migrate:fresh --force
+
+    - name: Execute tests
+      run: ./vendor/bin/phpunit
+
+    - name: Run Laravel Pint
+      run: ./vendor/bin/pint --test
+
+    - name: Create production database export
+      run: |
+        # Export schema dan data dari test database
+        mysqldump -h 127.0.0.1 -u root -ppassword attendance_system_test --no-data > database/schema.sql
+        mysqldump -h 127.0.0.1 -u root -ppassword attendance_system_test --no-create-info > database/db.sql
+        
+        # Buat contoh data untuk production
+        echo "-- Sample Data for Attendance System" >> database/db.sql
+        echo "INSERT INTO users (name, email, password, created_at, updated_at) VALUES" >> database/db.sql
+        echo "('Admin User', 'admin@example.com', '\$2y\$10\$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', NOW(), NOW());" >> database/db.sql
+
+    - name: Create deployment package
+      run: |
+        mkdir -p deployment
+        
+        # Copy essential Laravel files
+        cp -r app bootstrap config database public resources routes storage deployment/
+        cp -r vendor deployment/
+        cp .env.example deployment/
+        cp artisan deployment/
+        cp composer.json deployment/
+        cp composer.lock deployment/
+        cp phpunit.xml deployment/
+        
+        # Copy database files
+        cp database/schema.sql deployment/
+        cp database/db.sql deployment/
+        
+        # Create deployment instructions
+        cat > deployment/DEPLOYMENT.md << 'EOF2'
+        # Laravel Attendance System - Deployment Guide
+        
+        ## Server Requirements
+        - PHP 8.1+
+        - MySQL 8.0+
+        - Composer
+        
+        ## Installation Steps
+        1. Upload all files to server
+        2. Run: cp .env.example .env
+        3. Edit .env with your database credentials
+        4. Run: php artisan key:generate
+        5. Import database/db.sql to phpMyAdmin
+        6. Set proper permissions
+        7. Configure web server document root to /public
+        
+        ## Default Admin Login
+        - Email: admin@example.com
+        - Password: password
+        EOF2
+
+    - name: Create zip artifact
+      run: |
+        cd deployment
+        zip -r ../laravel-attendance-system.zip .
+        cd ..
+
+    - name: Upload deployment package
+      uses: actions/upload-artifact@v4
+      with:
+        name: laravel-attendance-system
+        path: laravel-attendance-system.zip
+        retention-days: 30
+
+    - name: Upload database files
+      uses: actions/upload-artifact@v4
+      with:
+        name: database-files
+        path: |
+          deployment/db.sql
+          deployment/schema.sql
+        retention-days: 30
+EOF
