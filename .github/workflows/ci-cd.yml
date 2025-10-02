@@ -1,5 +1,4 @@
-# Buat file workflow
-cat > .github/workflows/ci-cd.yml << 'EOF'
+
 name: Laravel Attendance System CI/CD
 
 on:
@@ -20,7 +19,11 @@ jobs:
           MYSQL_DATABASE: attendance_system
         ports:
           - 3306:3306
-        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
 
     steps:
     - name: Checkout code
@@ -95,7 +98,7 @@ jobs:
         cp database/db.sql deployment/
         
         # Create deployment instructions
-        cat > deployment/DEPLOYMENT.md << 'EOF2'
+        cat > deployment/DEPLOYMENT.md << 'DOCEOF'
         # Laravel Attendance System - Deployment Guide
         
         ## Server Requirements
@@ -115,7 +118,7 @@ jobs:
         ## Default Admin Login
         - Email: admin@example.com
         - Password: password
-        EOF2
+        DOCEOF
 
     - name: Create zip artifact
       run: |
